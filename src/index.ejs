@@ -7,9 +7,13 @@
     <title>Document</title>
   </head>
   <body>
-    <form action="POST">
+    <h1><%= message %></h1>
+    <form action="/" enctype="multipart/form-data" method="POST">
       <label for="file">Select File</label>
-      <input id="file" type="file" />
+      <br>
+      <input id="file" name="file" type="file" />
+      <br>
+      <button type="submit">Send</button>
     </form>
   </body>
 </html>
