@@ -75,6 +75,9 @@ app.get("/video/stream/:name", (req, res) => {
   const readStream = createReadStream(
     path.resolve(__dirname, "../uploads", segmentName)
   );
+  readStream.on("error", err => {
+    res.sendStatus(404);
+  });
   readStream.pipe(res);
 });
 
