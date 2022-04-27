@@ -10,7 +10,8 @@
     "multer": "^1.4.4"
   },
   "scripts": {
-    "dev": "nodemon src/index.ts"
+    "dev": "nodemon src/index.ts",
+    "build-front": "tsc --project tsconfig.frontend.json"
   },
   "devDependencies": {
     "@types/express": "^4.17.13",

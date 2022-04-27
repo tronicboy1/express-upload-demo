@@ -64,7 +64,8 @@ getMPD("output_dash.mpd").then(function (mediaInfo) {
                         .then(function () {
                         segmentNumber++;
                         repeatSegment();
-                    })["catch"](function (error) { return console.log(error); });
+                    })
+                        .catch(function (error) { return console.log(error); });
                 };
                 repeatSegment();
             });
