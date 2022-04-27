@@ -65,9 +65,17 @@ app.get("/video", (req, res) => {
   res.render("video.ejs");
 });
 
-app.put("/video", upload.single("file"), (req, res) => {
-  console.log(req.file);
-  res.json({})
+app.get("/video/:name", (req, res) => {
+  const videoName = req.params.name;
+  res.sendFile(path.resolve(__dirname, "../uploads", videoName));
+});
+
+app.get("/video/stream/:name", (req, res) => {
+  const segmentName = req.params.name;
+  const readStream = createReadStream(
+    path.resolve(__dirname, "../uploads", segmentName)
+  );
+  readStream.pipe(res);
 });
 
 const port = 4000;
