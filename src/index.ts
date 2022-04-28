@@ -42,12 +42,16 @@ const server = https.createServer(
 
 app.get("/", (req, res) => {
   new Promise<string>((resolve, reject) =>
-    exec("ls -a", { encoding: "utf-8" }, (error, stdout, stderr) => {
-      if (error) reject(stderr);
-      resolve(stdout);
-    })
+    exec(
+      "ffprobe uploads/output.mp4 -show_streams -print_format json",
+      { encoding: "utf-8" },
+      (error, stdout, stderr) => {
+        if (error) reject(stderr);
+        resolve(stdout);
+      }
+    )
   )
-    .then(stdout => console.log(stdout))
+    .then(stdout => console.log(JSON.parse(stdout)))
     .catch(error => console.log(error))
     .finally(() =>
       res.render(path.join(__dirname, "index.ejs"), { message: "Hello World" })
