@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import path from "path";
 import https from "https";
 import { readFileSync, createReadStream } from "fs";
+import { execSync, exec } from "child_process";
 import multer from "multer";
 
 const storage = multer.diskStorage({
@@ -40,7 +41,17 @@ const server = https.createServer(
 );
 
 app.get("/", (req, res) => {
-  res.render(path.join(__dirname, "index.ejs"), { message: "Hello World" });
+  new Promise<string>((resolve, reject) =>
+    exec("ls -a", { encoding: "utf-8" }, (error, stdout, stderr) => {
+      if (error) reject(stderr);
+      resolve(stdout);
+    })
+  )
+    .then(stdout => console.log(stdout))
+    .catch(error => console.log(error))
+    .finally(() =>
+      res.render(path.join(__dirname, "index.ejs"), { message: "Hello World" })
+    );
 });
 
 app.get("/uploads/:fileName", (req, res) => {
