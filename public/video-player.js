@@ -4,6 +4,7 @@ class VideoPlayer {
     mediaSource;
     #videoSourceBuffer;
     #videoBufferEventListener;
+    #currentVideoTrack;
     #audioSourceBuffer;
     #audioBufferEventListener;
     #segmentNumber;
@@ -18,6 +19,8 @@ class VideoPlayer {
         this.mediaInfo = await this.#getMPD(MPDFileName);
         this.mediaSource = new MediaSource();
         this.#segmentNumber = Number(this.mediaInfo.startNumber);
+        const videoTrackName = "240p";
+        this.#currentVideoTrack = this.mediaInfo.videoTracks.find(track => track.id === videoTrackName);
         await new Promise((resolve, reject) => {
             this.#viewer.src = URL.createObjectURL(this.mediaSource);
             this.#viewer.onloadedmetadata = event => {
@@ -31,8 +34,10 @@ class VideoPlayer {
             }
             this.mediaSource.addEventListener("sourceopen", () => resolve(true));
         });
-        this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(this.mediaInfo.type);
-        await this.#loadSegment(this.mediaInfo.initialization); // load video info moov atom
+        this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(this.#currentVideoTrack.type);
+        const initTemplate = this.mediaInfo.initialization.split("$");
+        const initialSegmentName = initTemplate[0] + this.#currentVideoTrack.id + initTemplate[2];
+        await this.#loadSegment(initialSegmentName); // load video info moov atom
         this.#calculateFinalSegmentNumber();
         await this.#loadSegment(); // load first segment
         console.log(this.#segmentNumber);
@@ -53,6 +58,20 @@ class VideoPlayer {
         const segmentFPS = Number(template.getAttribute("timescale"));
         const startNumber = Number(template.getAttribute("startNumber"));
         const segmentFrameCount = Number(template.getAttribute("duration"));
+        const splitMedia = media.split("$");
+        const videoTracks = Array.from(xml.getElementsByTagName("Representation")).reduce((prev, element) => {
+            const mimeType = element.getAttribute("mimeType");
+            if (mimeType === "video/mp4") {
+                const id = element.getAttribute("id");
+                const codecs = element.getAttribute("codecs");
+                const type = `${mimeType}; codecs="${codecs}"`;
+                const template = splitMedia[0] + id + splitMedia[2] + "$number$" + splitMedia[4];
+                const segmentLength = Number(element.getAttribute("duration")) /
+                    Number(element.getAttribute("timescale"));
+                return [...prev, { id, type, segmentLength, template }];
+            }
+            return prev;
+        }, []);
         return {
             type,
             media,
@@ -60,6 +79,7 @@ class VideoPlayer {
             startNumber,
             segmentFPS,
             segmentFrameCount,
+            videoTracks,
         };
     }
     async #getSegment(segmentName) {
@@ -69,7 +89,7 @@ class VideoPlayer {
         return await response.arrayBuffer();
     }
     async #loadSegment(initialSegmentName) {
-        const segmentNameTemplate = this.mediaInfo.media.split("$");
+        const segmentNameTemplate = this.#currentVideoTrack.template.split("$");
         const segmentName = initialSegmentName ?? // for loading initial buffer
             segmentNameTemplate[0] +
                 String(this.#segmentNumber) +

@@ -120,5 +120,5 @@ import VideoPlayer from "./video-player.js"
 // };
 
 const videoPlayer = new VideoPlayer("viewer");
-videoPlayer.loadVideo("output_dash.mpd");
+videoPlayer.loadVideo("sanshin.mpd");
 
