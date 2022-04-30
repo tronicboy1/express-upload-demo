@@ -2,8 +2,8 @@
   "compilerOptions": {
     "outDir": "public",
     "noImplicitAny": true,
-    "module": "es6",
-    "target": "es5",
+    "module": "ESNext",
+    "target": "ESNext",
     "jsx": "react",
     "allowJs": true,
     "moduleResolution": "node"
