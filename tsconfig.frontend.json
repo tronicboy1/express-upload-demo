@@ -4,6 +4,7 @@
     "noImplicitAny": true,
     "module": "ESNext",
     "target": "ESNext",
+    "sourceMap": true,
     "jsx": "react",
     "allowJs": true,
     "moduleResolution": "node"

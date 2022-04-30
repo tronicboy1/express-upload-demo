@@ -1,11 +1,9 @@
 type MediaInfo = {
-  type: string;
   media: string;
-  initialization: string;
   startNumber: number;
   segmentFPS: number;
   segmentFrameCount: number;
-  videoTracks: TrackInfo[];
+  tracks: TrackInfo[];
 };
 
 type TrackInfo = {
@@ -13,6 +11,8 @@ type TrackInfo = {
   type: string;
   segmentLength: number;
   template: string;
+  init: string;
+  startNumber: number;
 };
 
 class VideoPlayer {
@@ -22,9 +22,11 @@ class VideoPlayer {
   #videoSourceBuffer: SourceBuffer;
   #videoBufferEventListener: EventListener;
   #currentVideoTrack: TrackInfo;
+  #videoSegmentNumber: number;
   #audioSourceBuffer: SourceBuffer;
   #audioBufferEventListener: EventListener;
-  #segmentNumber: number;
+  #currentAudioTrack: TrackInfo;
+  #audioSegmentNumber: number;
   #finalSegmentNumber: number;
 
   constructor(viewerElementId: string) {
@@ -37,26 +39,27 @@ class VideoPlayer {
   async loadVideo(MPDFileName: string) {
     this.mediaInfo = await this.#getMPD(MPDFileName);
     this.mediaSource = new MediaSource();
-    this.#segmentNumber = Number(this.mediaInfo.startNumber);
 
-    const videoTrackName = "240p";
-    this.#currentVideoTrack = this.mediaInfo.videoTracks.find(
-      track => track.id === videoTrackName
-    );
+    const videoTrackName = "1080p";
+    this.changeVideoTrack(videoTrackName);
+    this.changeAudioTrack("Japanese");
+    this.#videoSegmentNumber = this.#currentVideoTrack.startNumber;
+    this.#audioSegmentNumber = this.#currentAudioTrack.startNumber;
 
     await new Promise<boolean>((resolve, reject) => {
       this.#viewer.src = URL.createObjectURL(this.mediaSource);
       this.#viewer.onloadedmetadata = event => {
-        console.log("data available");
-        this.#viewer.playbackRate = 2;
         this.#viewer.onseeked = event => console.log(event);
         this.#viewer.addEventListener("seeking", event =>
           console.log("seeking", event)
         );
+        this.#viewer.addEventListener("play", () =>
+          Promise.all([
+            this.#repeatVideoSegmentLoad(),
+            this.#repeatAudioSegmentLoad(),
+          ]).finally(() => this.mediaSource.endOfStream())
+        );
       };
-      if (!MediaSource.isTypeSupported(this.mediaInfo.type)) {
-        reject("unsupported video type");
-      }
 
       this.mediaSource.addEventListener("sourceopen", () => resolve(true));
     });
@@ -64,16 +67,30 @@ class VideoPlayer {
     this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(
       this.#currentVideoTrack.type
     );
+    this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
+      this.#currentAudioTrack.type
+    );
 
-    const initTemplate = this.mediaInfo.initialization.split("$");
-    const initialSegmentName =
-      initTemplate[0] + this.#currentVideoTrack.id + initTemplate[2];
-    await this.#loadSegment(initialSegmentName); // load video info moov atom
+    await Promise.all([
+      this.#loadVideoSegment(this.#currentVideoTrack.init),
+      this.#loadAudioSegment(this.#currentAudioTrack.init),
+    ]); // load video info moov atom
 
     this.#calculateFinalSegmentNumber();
 
-    await this.#loadSegment(); // load first segment
-    console.log(this.#segmentNumber);
+    await Promise.all([this.#loadVideoSegment(), this.#loadAudioSegment()]); // load first segment
+  }
+
+  async #repeatVideoSegmentLoad() {
+    while (this.#videoSegmentNumber <= this.#finalSegmentNumber) {
+      await this.#loadVideoSegment();
+    }
+  }
+
+  async #repeatAudioSegmentLoad() {
+    while (this.#audioSegmentNumber <= this.#finalSegmentNumber) {
+      await this.#loadAudioSegment();
+    }
   }
 
   async #getMPD(fileName: string) {
@@ -84,44 +101,43 @@ class VideoPlayer {
     const text = await response.text();
     const xml = new window.DOMParser().parseFromString(text, "text/xml");
 
-    const representation = xml.getElementsByTagName("Representation")[0];
-    const mimeType = representation.getAttribute("mimeType");
-    const codecs = representation.getAttribute("codecs");
-    const type = `${mimeType}; codecs="${codecs}"`;
     const template = xml.getElementsByTagName("SegmentTemplate")[0];
     const media = template.getAttribute("media");
-    const initialization = template.getAttribute("initialization");
     const segmentFPS = Number(template.getAttribute("timescale"));
     const startNumber = Number(template.getAttribute("startNumber"));
     const segmentFrameCount = Number(template.getAttribute("duration"));
-    const splitMedia = media.split("$");
-    const videoTracks = Array.from(
-      xml.getElementsByTagName("Representation")
-    ).reduce<TrackInfo[]>((prev, element) => {
-      const mimeType = element.getAttribute("mimeType");
-      if (mimeType === "video/mp4") {
-        const id = element.getAttribute("id");
-        const codecs = element.getAttribute("codecs");
-        const type = `${mimeType}; codecs="${codecs}"`;
+    const tracks = Array.from(xml.getElementsByTagName("AdaptationSet")).reduce<
+      TrackInfo[]
+    >((prev, element) => {
+      const segmentTemplate =
+        element.getElementsByTagName("SegmentTemplate")[0];
+      const representation = element.getElementsByTagName("Representation")[0];
+      const mimeType = representation.getAttribute("mimeType");
 
-        const template =
-          splitMedia[0] + id + splitMedia[2] + "$number$" + splitMedia[4];
-        const segmentLength =
-          Number(element.getAttribute("duration")) /
-          Number(element.getAttribute("timescale"));
-        return [...prev, { id, type, segmentLength, template }];
-      }
-      return prev;
+      const id = representation.getAttribute("id");
+      const codecs = representation.getAttribute("codecs");
+      const type = `${mimeType}; codecs="${codecs}"`;
+      const init = segmentTemplate
+        .getAttribute("initialization")
+        .replace(/\$\w*\$/, id);
+      const media = segmentTemplate.getAttribute("media");
+      const template = media.replace(/\$\w*\$/, id);
+      const startNumber = Number(segmentTemplate.getAttribute("startNumber"));
+      const segmentLength =
+        Number(segmentTemplate.getAttribute("duration")) /
+        Number(segmentTemplate.getAttribute("timescale"));
+      return [
+        ...prev,
+        { id, type, segmentLength, template, init, startNumber },
+      ];
     }, []);
 
     return {
-      type,
       media,
-      initialization,
       startNumber,
       segmentFPS,
       segmentFrameCount,
-      videoTracks,
+      tracks,
     };
   }
 
@@ -133,13 +149,13 @@ class VideoPlayer {
     return await response.arrayBuffer();
   }
 
-  async #loadSegment(initialSegmentName?: string) {
-    const segmentNameTemplate = this.#currentVideoTrack.template.split("$");
+  async #loadVideoSegment(initialSegmentName?: string) {
     const segmentName =
-      initialSegmentName ?? // for loading initial buffer
-      segmentNameTemplate[0] +
-        String(this.#segmentNumber) +
-        segmentNameTemplate[2];
+      initialSegmentName ??
+      this.#currentVideoTrack.template.replace(
+        /\$\w*\$/,
+        String(this.#videoSegmentNumber)
+      );
     const nextSegment = await this.#getSegment(segmentName);
 
     await new Promise<boolean>((resolve, reject) => {
@@ -156,14 +172,40 @@ class VideoPlayer {
       );
     });
 
-    if (!initialSegmentName) this.#segmentNumber++; // increment if not loading initial
+    if (!initialSegmentName) this.#videoSegmentNumber++; // increment if not loading initial
+  }
+
+  async #loadAudioSegment(initialSegmentName?: string) {
+    const segmentName =
+      initialSegmentName ??
+      this.#currentAudioTrack.template.replace(
+        /\$\w*\$/,
+        String(this.#audioSegmentNumber)
+      );
+    const nextSegment = await this.#getSegment(segmentName);
+
+    await new Promise<boolean>((resolve, reject) => {
+      this.#audioSourceBuffer.appendBuffer(nextSegment);
+
+      this.#audioSourceBuffer.removeEventListener(
+        "updateend",
+        this.#audioBufferEventListener
+      );
+      this.#audioBufferEventListener = () => resolve(true);
+      this.#audioSourceBuffer.addEventListener(
+        "updateend",
+        this.#audioBufferEventListener
+      );
+    });
+
+    if (!initialSegmentName) this.#audioSegmentNumber++; // increment if not loading initial
   }
 
   async #appendAudioBuffer() {
     const segmentNameTemplate = this.mediaInfo.media.split("$");
     const segmentName =
       segmentNameTemplate[0] +
-      String(this.#segmentNumber) +
+      String(this.#audioSegmentNumber) +
       segmentNameTemplate[2];
     const nextSegment = await this.#getSegment(segmentName);
 
@@ -184,13 +226,25 @@ class VideoPlayer {
 
   #calculateFinalSegmentNumber() {
     const videoLength = this.mediaSource.duration;
-    const segmentLength =
-      this.mediaInfo.segmentFrameCount / this.mediaInfo.segmentFPS;
-    console.log(
-      videoLength,
-      segmentLength,
-      Math.ceil(videoLength / segmentLength)
+    const segmentLength = this.#currentVideoTrack.segmentLength;
+    this.#finalSegmentNumber = Math.ceil(videoLength / segmentLength);
+  }
+
+  changeVideoTrack(trackName: string) {
+    this.#currentVideoTrack = this.mediaInfo.tracks.find(
+      track => track.id === trackName
     );
+    if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type)) {
+      throw Error("unsupported video type");
+    }
+  }
+  changeAudioTrack(trackName: string) {
+    this.#currentAudioTrack = this.mediaInfo.tracks.find(
+      track => track.id === trackName
+    );
+    if (!MediaSource.isTypeSupported(this.#currentAudioTrack.type)) {
+      throw Error("unsupported video type");
+    }
   }
 }
 
