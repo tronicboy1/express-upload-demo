@@ -122,3 +122,10 @@ import VideoPlayer from "./video-player.js"
 const videoPlayer = new VideoPlayer("viewer");
 videoPlayer.loadVideo("sanshin.mpd");
 
+const qualitySelect = document.getElementById("video-quality") as HTMLSelectElement;
+qualitySelect.addEventListener("change", (event) => {
+  console.log("track")
+  const newTrack = qualitySelect.value;
+  videoPlayer.changeVideoTrack(newTrack);
+})
+
