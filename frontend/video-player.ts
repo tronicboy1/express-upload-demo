@@ -44,8 +44,8 @@ class VideoPlayer {
     this.mediaInfo = await this.#getMPD(MPDFileName);
     this.mediaSource = new MediaSource();
 
-    const videoTrackName = "240p";
-    const audioTrackName = "Japanese";
+    const videoTrackName = "0";
+    const audioTrackName = "3";
     this.#currentVideoTrack = this.mediaInfo.tracks.find(
       track => track.id === videoTrackName
     );
@@ -67,15 +67,17 @@ class VideoPlayer {
       this.#viewer.onloadedmetadata = event => {
         this.#viewer.onseeked = event => console.log(event);
         this.#viewer.addEventListener("seeking", event =>
-          console.log("seeking", event)
+          console.log("seeking", event, this.mediaSource.readyState)
         );
         this.#viewer.onerror = () => console.error(this.#viewer.error);
-        this.#viewer.addEventListener("play", () =>
-          Promise.all([
-            this.#repeatVideoSegmentLoad(),
-            this.#repeatAudioSegmentLoad(),
-          ]).finally(() => this.mediaSource.endOfStream())
-        );
+        this.#viewer.addEventListener("play", () => {
+          if (this.mediaSource.readyState === "open") {
+            Promise.all([
+              this.#repeatVideoSegmentLoad(),
+              this.#repeatAudioSegmentLoad(),
+            ]).finally(() => this.mediaSource.endOfStream());
+          }
+        });
       };
 
       this.mediaSource.addEventListener("sourceopen", () => resolve(true));
@@ -115,14 +117,25 @@ class VideoPlayer {
   }
 
   async #repeatVideoSegmentLoad() {
-    while (this.#videoSegmentNumber <= this.#finalSegmentNumber) {
-      await this.#loadVideoSegment();
+    try {
+      while (true) {
+        await this.#loadVideoSegment();
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
   async #repeatAudioSegmentLoad() {
-    while (this.#audioSegmentNumber <= this.#finalSegmentNumber) {
-      await this.#loadAudioSegment();
+    // while (this.#audioSegmentNumber <= this.#finalSegmentNumber) {
+    //   await this.#loadAudioSegment();
+    // }
+    try {
+      while (true) {
+        await this.#loadAudioSegment();
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
@@ -152,9 +165,9 @@ class VideoPlayer {
       const type = `${mimeType}; codecs="${codecs}"`;
       const init = segmentTemplate
         .getAttribute("initialization")
-        .replace(/\$\w*\$/, id);
+        .replace(/\$RepresentationID\$/, id);
       const media = segmentTemplate.getAttribute("media");
-      const template = media.replace(/\$\w*\$/, id);
+      const template = media.replace(/\$RepresentationID\$/, id);
       const startNumber = Number(segmentTemplate.getAttribute("startNumber"));
       const segmentLength =
         Number(segmentTemplate.getAttribute("duration")) /
@@ -164,6 +177,7 @@ class VideoPlayer {
         { id, type, segmentLength, template, init, startNumber },
       ];
     }, []);
+    console.log(tracks);
 
     return {
       media,
@@ -175,25 +189,21 @@ class VideoPlayer {
   }
 
   async #getSegment(segmentName: string) {
-    try {
-      const response = await fetch(`/video/stream/${segmentName}`, {
-        signal: this.#signal,
-      });
+    const response = await fetch(`/video/stream/${segmentName}`, {
+      signal: this.#signal,
+    });
 
-      if (!response.ok) throw Error(`Invalid response: ${response.status}`);
+    if (!response.ok) throw Error(`Invalid response: ${response.status}`);
 
-      return await response.arrayBuffer();
-    } catch (error) {
-      console.log(error);
-    }
+    return await response.arrayBuffer();
   }
 
   async #loadVideoSegment(initialSegmentName?: string) {
     const segmentName =
       initialSegmentName ??
       this.#currentVideoTrack.template.replace(
-        /\$\w*\$/,
-        String(this.#videoSegmentNumber)
+        /\$Number%05d\$/,
+        pad(this.#videoSegmentNumber, 5)
       );
     const nextSegment = await this.#getSegment(segmentName);
 
@@ -218,8 +228,8 @@ class VideoPlayer {
     const segmentName =
       initialSegmentName ??
       this.#currentAudioTrack.template.replace(
-        /\$\w*\$/,
-        String(this.#audioSegmentNumber)
+        /\$Number%05d\$/,
+        pad(this.#videoSegmentNumber, 5)
       );
     const nextSegment = await this.#getSegment(segmentName);
 
@@ -254,7 +264,7 @@ class VideoPlayer {
     if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type)) {
       throw Error("unsupported video type");
     }
-    this.#controller.abort();
+    //this.#controller.abort();
     this.#videoSourceBuffer.changeType(this.#currentVideoTrack.type);
     this.#videoSegmentNumber =
       Math.floor(
@@ -278,5 +288,16 @@ class VideoPlayer {
     }
   }
 }
+
+const pad = (num: number, padSize: number) => {
+  const numString = String(num);
+  const numStringLength = numString.length;
+  const padBase = "0";
+  let pad = "";
+  for (let i = 0; i < padSize - numStringLength; i++) {
+    pad = pad + padBase;
+  }
+  return pad + numString;
+};
 
 export default VideoPlayer;
