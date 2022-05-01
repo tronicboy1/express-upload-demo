@@ -120,7 +120,7 @@ import VideoPlayer from "./video-player.js"
 // };
 
 const videoPlayer = new VideoPlayer("viewer");
-videoPlayer.loadVideo("adaptive.mpd");
+videoPlayer.loadVideo("sanshin.mpd");
 
 const qualitySelect = document.getElementById("video-quality") as HTMLSelectElement;
 qualitySelect.addEventListener("change", (event) => {

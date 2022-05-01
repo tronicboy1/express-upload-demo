@@ -44,8 +44,8 @@ class VideoPlayer {
     this.mediaInfo = await this.#getMPD(MPDFileName);
     this.mediaSource = new MediaSource();
 
-    const videoTrackName = "0";
-    const audioTrackName = "3";
+    const videoTrackName = "480p";
+    const audioTrackName = "Japanese";
     this.#currentVideoTrack = this.mediaInfo.tracks.find(
       track => track.id === videoTrackName
     );
@@ -74,7 +74,7 @@ class VideoPlayer {
           if (this.mediaSource.readyState === "open") {
             Promise.all([
               this.#repeatVideoSegmentLoad(),
-              this.#repeatAudioSegmentLoad(),
+              //this.#repeatAudioSegmentLoad(),
             ]).finally(() => this.mediaSource.endOfStream());
           }
         });
@@ -86,18 +86,20 @@ class VideoPlayer {
     this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(
       this.#currentVideoTrack.type
     );
-    this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
-      this.#currentAudioTrack.type
-    );
+    // this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
+    //   this.#currentAudioTrack.type
+    // );
 
     await Promise.all([
       this.#loadVideoSegment(this.#currentVideoTrack.init),
-      this.#loadAudioSegment(this.#currentAudioTrack.init),
+      //this.#loadAudioSegment(this.#currentAudioTrack.init),
     ]); // load video info moov atom
 
     this.#calculateFinalSegmentNumber();
 
-    await Promise.all([this.#loadVideoSegment(), this.#loadAudioSegment()]); // load first segment
+    await Promise.all([this.#loadVideoSegment(),
+      //this.#loadAudioSegment()
+    ]); // load first segment
   }
 
   async #loadAllTracks() {
@@ -117,25 +119,14 @@ class VideoPlayer {
   }
 
   async #repeatVideoSegmentLoad() {
-    try {
-      while (true) {
-        await this.#loadVideoSegment();
-      }
-    } catch (error) {
-      console.log(error);
+    while (this.#videoSegmentNumber <= this.#finalSegmentNumber) {
+      await this.#loadVideoSegment();
     }
   }
 
   async #repeatAudioSegmentLoad() {
-    // while (this.#audioSegmentNumber <= this.#finalSegmentNumber) {
-    //   await this.#loadAudioSegment();
-    // }
-    try {
-      while (true) {
-        await this.#loadAudioSegment();
-      }
-    } catch (error) {
-      console.log(error);
+    while (this.#audioSegmentNumber <= this.#finalSegmentNumber) {
+      await this.#loadAudioSegment();
     }
   }
 
@@ -202,8 +193,8 @@ class VideoPlayer {
     const segmentName =
       initialSegmentName ??
       this.#currentVideoTrack.template.replace(
-        /\$Number%05d\$/,
-        pad(this.#videoSegmentNumber, 5)
+        /\$Number\$/,
+        String(this.#videoSegmentNumber)
       );
     const nextSegment = await this.#getSegment(segmentName);
 
@@ -228,8 +219,8 @@ class VideoPlayer {
     const segmentName =
       initialSegmentName ??
       this.#currentAudioTrack.template.replace(
-        /\$Number%05d\$/,
-        pad(this.#videoSegmentNumber, 5)
+        /\$Number\$/,
+        String(this.#videoSegmentNumber)
       );
     const nextSegment = await this.#getSegment(segmentName);
 

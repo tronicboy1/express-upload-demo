@@ -1,5 +1,7 @@
 class VideoPlayer {
     #viewer;
+    #controller;
+    #signal;
     mediaInfo;
     mediaSource;
     #videoSourceBuffer;
@@ -16,35 +18,62 @@ class VideoPlayer {
         if (!(viewerElement instanceof HTMLVideoElement))
             throw Error("Element Id did not yield a valid player element");
         this.#viewer = viewerElement;
+        this.#controller = new AbortController();
+        this.#signal = this.#controller.signal;
     }
     async loadVideo(MPDFileName) {
         this.mediaInfo = await this.#getMPD(MPDFileName);
         this.mediaSource = new MediaSource();
-        const videoTrackName = "1080p";
-        this.changeVideoTrack(videoTrackName);
-        this.changeAudioTrack("Japanese");
+        const videoTrackName = "480p";
+        const audioTrackName = "Japanese";
+        this.#currentVideoTrack = this.mediaInfo.tracks.find(track => track.id === videoTrackName);
+        this.#currentAudioTrack = this.mediaInfo.tracks.find(track => track.id === audioTrackName);
+        if (!(MediaSource.isTypeSupported(this.#currentVideoTrack.type) &&
+            MediaSource.isTypeSupported(this.#currentAudioTrack.type)))
+            throw Error("unsupported video type");
         this.#videoSegmentNumber = this.#currentVideoTrack.startNumber;
         this.#audioSegmentNumber = this.#currentAudioTrack.startNumber;
         await new Promise((resolve, reject) => {
             this.#viewer.src = URL.createObjectURL(this.mediaSource);
             this.#viewer.onloadedmetadata = event => {
                 this.#viewer.onseeked = event => console.log(event);
-                this.#viewer.addEventListener("seeking", event => console.log("seeking", event));
-                this.#viewer.addEventListener("play", () => Promise.all([
-                    this.#repeatVideoSegmentLoad(),
-                    this.#repeatAudioSegmentLoad(),
-                ]).finally(() => this.mediaSource.endOfStream()));
+                this.#viewer.addEventListener("seeking", event => console.log("seeking", event, this.mediaSource.readyState));
+                this.#viewer.onerror = () => console.error(this.#viewer.error);
+                this.#viewer.addEventListener("play", () => {
+                    if (this.mediaSource.readyState === "open") {
+                        Promise.all([
+                            this.#repeatVideoSegmentLoad(),
+                            //this.#repeatAudioSegmentLoad(),
+                        ]).finally(() => this.mediaSource.endOfStream());
+                    }
+                });
             };
             this.mediaSource.addEventListener("sourceopen", () => resolve(true));
         });
         this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(this.#currentVideoTrack.type);
-        this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(this.#currentAudioTrack.type);
+        // this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
+        //   this.#currentAudioTrack.type
+        // );
+        await Promise.all([
+            this.#loadVideoSegment(this.#currentVideoTrack.init),
+            //this.#loadAudioSegment(this.#currentAudioTrack.init),
+        ]); // load video info moov atom
+        this.#calculateFinalSegmentNumber();
+        await Promise.all([this.#loadVideoSegment(),
+            //this.#loadAudioSegment()
+        ]); // load first segment
+    }
+    async #loadAllTracks() {
         await Promise.all([
             this.#loadVideoSegment(this.#currentVideoTrack.init),
             this.#loadAudioSegment(this.#currentAudioTrack.init),
         ]); // load video info moov atom
         this.#calculateFinalSegmentNumber();
         await Promise.all([this.#loadVideoSegment(), this.#loadAudioSegment()]); // load first segment
+        Promise.allSettled([
+            this.#repeatVideoSegmentLoad(),
+            this.#repeatAudioSegmentLoad(),
+        ]).finally(() => this.mediaSource.endOfStream());
     }
     async #repeatVideoSegmentLoad() {
         while (this.#videoSegmentNumber <= this.#finalSegmentNumber) {
@@ -76,9 +105,9 @@ class VideoPlayer {
             const type = `${mimeType}; codecs="${codecs}"`;
             const init = segmentTemplate
                 .getAttribute("initialization")
-                .replace(/\$\w*\$/, id);
+                .replace(/\$RepresentationID\$/, id);
             const media = segmentTemplate.getAttribute("media");
-            const template = media.replace(/\$\w*\$/, id);
+            const template = media.replace(/\$RepresentationID\$/, id);
             const startNumber = Number(segmentTemplate.getAttribute("startNumber"));
             const segmentLength = Number(segmentTemplate.getAttribute("duration")) /
                 Number(segmentTemplate.getAttribute("timescale"));
@@ -87,6 +116,7 @@ class VideoPlayer {
                 { id, type, segmentLength, template, init, startNumber },
             ];
         }, []);
+        console.log(tracks);
         return {
             media,
             startNumber,
@@ -96,14 +126,16 @@ class VideoPlayer {
         };
     }
     async #getSegment(segmentName) {
-        const response = await fetch(`/video/stream/${segmentName}`);
+        const response = await fetch(`/video/stream/${segmentName}`, {
+            signal: this.#signal,
+        });
         if (!response.ok)
             throw Error(`Invalid response: ${response.status}`);
         return await response.arrayBuffer();
     }
     async #loadVideoSegment(initialSegmentName) {
         const segmentName = initialSegmentName ??
-            this.#currentVideoTrack.template.replace(/\$\w*\$/, String(this.#videoSegmentNumber));
+            this.#currentVideoTrack.template.replace(/\$Number\$/, String(this.#videoSegmentNumber));
         const nextSegment = await this.#getSegment(segmentName);
         await new Promise((resolve, reject) => {
             this.#videoSourceBuffer.appendBuffer(nextSegment);
@@ -116,7 +148,7 @@ class VideoPlayer {
     }
     async #loadAudioSegment(initialSegmentName) {
         const segmentName = initialSegmentName ??
-            this.#currentAudioTrack.template.replace(/\$\w*\$/, String(this.#audioSegmentNumber));
+            this.#currentAudioTrack.template.replace(/\$Number\$/, String(this.#videoSegmentNumber));
         const nextSegment = await this.#getSegment(segmentName);
         await new Promise((resolve, reject) => {
             this.#audioSourceBuffer.appendBuffer(nextSegment);
@@ -127,29 +159,27 @@ class VideoPlayer {
         if (!initialSegmentName)
             this.#audioSegmentNumber++; // increment if not loading initial
     }
-    async #appendAudioBuffer() {
-        const segmentNameTemplate = this.mediaInfo.media.split("$");
-        const segmentName = segmentNameTemplate[0] +
-            String(this.#audioSegmentNumber) +
-            segmentNameTemplate[2];
-        const nextSegment = await this.#getSegment(segmentName);
-        await new Promise((resolve, reject) => {
-            this.#audioSourceBuffer.appendBuffer(nextSegment);
-            this.#audioSourceBuffer.removeEventListener("updateend", this.#audioBufferEventListener);
-            this.#audioBufferEventListener = () => resolve(true);
-            this.#audioSourceBuffer.addEventListener("updateend", this.#audioBufferEventListener);
-        });
-    }
     #calculateFinalSegmentNumber() {
         const videoLength = this.mediaSource.duration;
         const segmentLength = this.#currentVideoTrack.segmentLength;
         this.#finalSegmentNumber = Math.ceil(videoLength / segmentLength);
+        console.log(this.#finalSegmentNumber);
     }
     changeVideoTrack(trackName) {
         this.#currentVideoTrack = this.mediaInfo.tracks.find(track => track.id === trackName);
         if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type)) {
             throw Error("unsupported video type");
         }
+        //this.#controller.abort();
+        this.#videoSourceBuffer.changeType(this.#currentVideoTrack.type);
+        this.#videoSegmentNumber =
+            Math.floor(this.#viewer.currentTime / this.#currentVideoTrack.segmentLength) + 1;
+        this.#audioSegmentNumber =
+            Math.floor(this.#viewer.currentTime / this.#currentAudioTrack.segmentLength) + 1;
+        this.#loadVideoSegment(this.#currentVideoTrack.init).then(() => {
+            this.#repeatVideoSegmentLoad();
+        });
+        //this.#loadAllTracks();
     }
     changeAudioTrack(trackName) {
         this.#currentAudioTrack = this.mediaInfo.tracks.find(track => track.id === trackName);
@@ -158,5 +188,15 @@ class VideoPlayer {
         }
     }
 }
+const pad = (num, padSize) => {
+    const numString = String(num);
+    const numStringLength = numString.length;
+    const padBase = "0";
+    let pad = "";
+    for (let i = 0; i < padSize - numStringLength; i++) {
+        pad = pad + padBase;
+    }
+    return pad + numString;
+};
 export default VideoPlayer;
 //# sourceMappingURL=video-player.js.map
