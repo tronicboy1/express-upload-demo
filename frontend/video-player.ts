@@ -74,7 +74,7 @@ class VideoPlayer {
           if (this.mediaSource.readyState === "open") {
             Promise.all([
               this.#repeatVideoSegmentLoad(),
-              //this.#repeatAudioSegmentLoad(),
+              this.#repeatAudioSegmentLoad(),
             ]).finally(() => this.mediaSource.endOfStream());
           }
         });
@@ -86,19 +86,19 @@ class VideoPlayer {
     this.#videoSourceBuffer = this.mediaSource.addSourceBuffer(
       this.#currentVideoTrack.type
     );
-    // this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
-    //   this.#currentAudioTrack.type
-    // );
+    this.#audioSourceBuffer = this.mediaSource.addSourceBuffer(
+      this.#currentAudioTrack.type
+    );
 
     await Promise.all([
       this.#loadVideoSegment(this.#currentVideoTrack.init),
-      //this.#loadAudioSegment(this.#currentAudioTrack.init),
+      this.#loadAudioSegment(this.#currentAudioTrack.init),
     ]); // load video info moov atom
 
     this.#calculateFinalSegmentNumber();
 
     await Promise.all([this.#loadVideoSegment(),
-      //this.#loadAudioSegment()
+      this.#loadAudioSegment()
     ]); // load first segment
   }
 
@@ -220,7 +220,7 @@ class VideoPlayer {
       initialSegmentName ??
       this.#currentAudioTrack.template.replace(
         /\$Number\$/,
-        String(this.#videoSegmentNumber)
+        String(this.#audioSegmentNumber)
       );
     const nextSegment = await this.#getSegment(segmentName);
 
