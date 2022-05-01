@@ -63,7 +63,7 @@ class VideoPlayer {
     await new Promise<boolean>((resolve, reject) => {
       this.#viewer.src = URL.createObjectURL(this.mediaSource);
       this.#viewer.onloadedmetadata = event => {
-        this.#viewer.onseeked = event => console.log(event);
+        this.#viewer.onseeked = event => console.log("seeked");
         this.#viewer.addEventListener("seeking", event => this.handleSeeking());
         this.#viewer.onerror = () => console.error(this.#viewer.error.message);
         this.#viewer.addEventListener("play", () => {
@@ -220,23 +220,39 @@ class VideoPlayer {
   }
 
   handleSeeking() {
-    const isBuffered = this.#viewer.buffered;
+    const bufferObj = this.#viewer.buffered;
+    const currentTime = this.#viewer.currentTime;
+    let isBuffered: boolean;
+    if (bufferObj.length) {
+      for (let i = 0; i < bufferObj.length; i++) {
+        const startTime = bufferObj.start(i);
+        const endTime = bufferObj.end(i);
+        if (currentTime <= endTime && currentTime >= startTime) {
+          isBuffered = true;
+          break;
+        }
+      }
+    } else {
+      isBuffered = false;
+    }
+    if (isBuffered) return;
+
     const calculatedTargetVideoSegment = Math.floor(
-      this.#viewer.currentTime / this.#currentVideoTrack.segmentLength
+      currentTime / this.#currentVideoTrack.segmentLength
     );
     this.#videoSegmentNumber =
       calculatedTargetVideoSegment === 0 ? 1 : calculatedTargetVideoSegment;
 
     const calculatedTargetAudioSegment = Math.floor(
-      this.#viewer.currentTime / this.#currentAudioTrack.segmentLength
+      currentTime / this.#currentAudioTrack.segmentLength
     );
     this.#audioSegmentNumber =
       calculatedTargetAudioSegment == 0 ? 1 : calculatedTargetAudioSegment;
-    console.log(
-      isBuffered.start(0),
-      isBuffered.end(0),
-      this.#currentVideoTrack.segmentLength
-    );
+
+    return Promise.all([
+      this.#repeatVideoSegmentLoad(),
+      this.#repeatAudioSegmentLoad(),
+    ]);
   }
 
   changeVideoTrack(trackName: string) {
