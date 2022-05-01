@@ -16,7 +16,7 @@ class VideoPlayer {
   #controller: AbortController;
   #signal: AbortSignal;
   #first: boolean;
-  mediaInfo: MediaInfo;
+  tracks: TrackInfo[];
   mediaSource: MediaSource;
   #videoSourceBuffer: SourceBuffer;
   #videoBufferEventListener: EventListener;
@@ -39,15 +39,15 @@ class VideoPlayer {
   }
 
   async loadVideo(MPDFileName: string) {
-    this.mediaInfo = await this.#getMPD(MPDFileName);
+    await this.#getMPD(MPDFileName);
     this.mediaSource = new MediaSource();
 
     const videoTrackName = "240p";
     const audioTrackName = "1";
-    this.#currentVideoTrack = this.mediaInfo.tracks.find(
+    this.#currentVideoTrack = this.tracks.find(
       track => track.id === videoTrackName
     );
-    this.#currentAudioTrack = this.mediaInfo.tracks.find(
+    this.#currentAudioTrack = this.tracks.find(
       track => track.id === audioTrackName
     );
     if (
@@ -148,11 +148,8 @@ class VideoPlayer {
 
       return [...prev, ...tracksInAdaptionSet];
     }, []);
-    console.log(tracks);
 
-    return {
-      tracks,
-    };
+    this.tracks = tracks;
   }
 
   async #getSegment(segmentName: string) {
@@ -225,7 +222,7 @@ class VideoPlayer {
   }
 
   changeVideoTrack(trackName: string) {
-    this.#currentVideoTrack = this.mediaInfo.tracks.find(
+    this.#currentVideoTrack = this.tracks.find(
       track => track.id === trackName
     );
     if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type)) {
@@ -246,7 +243,7 @@ class VideoPlayer {
   }
 
   changeAudioTrack(trackName: string) {
-    this.#currentAudioTrack = this.mediaInfo.tracks.find(
+    this.#currentAudioTrack = this.tracks.find(
       track => track.id === trackName
     );
     if (!MediaSource.isTypeSupported(this.#currentAudioTrack.type)) {
