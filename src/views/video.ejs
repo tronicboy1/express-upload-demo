@@ -1,18 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-  <script type="module" src="/public/index.js" defer></script>
-</head>
-<body>
-  <select name="video-quality" id="video-quality">
-    <option value="2">240p</option>
-    <option value="1">480p</option>
-    <option value="0">720p</option>
-  </select>
-  <video style="width: 100%; height: auto; max-height: 90vh;" id="viewer" autoplay controls></video>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script type="module" src="/public/index.js" defer></script>
+  </head>
+  <body>
+    <div>
+      <label for="video-quality">Video Quality</label>
+      <select name="video-quality" id="video-quality">
+        <option value="240p">240p</option>
+        <option value="480p">480p</option>
+        <option value="720p">720p</option>
+      </select>
+    </div>
+    <div>
+      <label for="audio-quality">Video Quality</label>
+      <select name="audio-quality" id="audio-quality" value="1">
+        <option value="2">64kbps</option>
+        <option value="1">128kbps</option>
+      </select>
+    </div>
+    <video
+      style="width: 100%; height: auto; max-height: 90vh"
+      id="viewer"
+      autoplay
+      controls
+    ></video>
+  </body>
 </html>
