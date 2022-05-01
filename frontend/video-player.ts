@@ -64,12 +64,7 @@ class VideoPlayer {
       this.#viewer.src = URL.createObjectURL(this.mediaSource);
       this.#viewer.onloadedmetadata = event => {
         this.#viewer.onseeked = event => console.log(event);
-        this.#viewer.addEventListener("seeking", event =>
-          Promise.allSettled([
-            this.changeVideoTrack(this.#currentVideoTrack.id),
-            this.changeAudioTrack(this.#currentAudioTrack.id),
-          ])
-        );
+        this.#viewer.addEventListener("seeking", event => this.handleSeeking());
         this.#viewer.onerror = () => console.error(this.#viewer.error.message);
         this.#viewer.addEventListener("play", () => {
           if (this.mediaSource.readyState === "open" && this.#first) {
@@ -224,7 +219,8 @@ class VideoPlayer {
     console.log(this.#finalSegmentNumber);
   }
 
-  handleSeek(newLocation: number) {
+  handleSeeking() {
+    const isBuffered = this.#viewer.buffered;
     const calculatedTargetVideoSegment = Math.floor(
       this.#viewer.currentTime / this.#currentVideoTrack.segmentLength
     );
@@ -236,18 +232,22 @@ class VideoPlayer {
     );
     this.#audioSegmentNumber =
       calculatedTargetAudioSegment == 0 ? 1 : calculatedTargetAudioSegment;
+    console.log(
+      isBuffered.start(0),
+      isBuffered.end(0),
+      this.#currentVideoTrack.segmentLength
+    );
   }
 
   changeVideoTrack(trackName: string) {
     this.#currentVideoTrack = this.tracks.find(track => track.id === trackName);
-    if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type)) {
+    if (!MediaSource.isTypeSupported(this.#currentVideoTrack.type))
       throw Error("unsupported video type");
-    }
-    const calculatedTargetSegment = Math.floor(
-      this.#viewer.currentTime / this.#currentVideoTrack.segmentLength
-    );
+
     this.#videoSegmentNumber =
-      calculatedTargetSegment === 0 ? 1 : calculatedTargetSegment;
+      Math.floor(
+        this.#viewer.currentTime / this.#currentVideoTrack.segmentLength
+      ) + 1;
     this.#loadVideoSegment(this.#currentVideoTrack.init)
       .then(() => {
         return this.#repeatVideoSegmentLoad();
@@ -260,15 +260,13 @@ class VideoPlayer {
 
   changeAudioTrack(trackName: string) {
     this.#currentAudioTrack = this.tracks.find(track => track.id === trackName);
-    if (!MediaSource.isTypeSupported(this.#currentAudioTrack.type)) {
+    if (!MediaSource.isTypeSupported(this.#currentAudioTrack.type))
       throw Error("unsupported video type");
-    }
-    const calculatedTargetSegment = Math.floor(
-      this.#viewer.currentTime / this.#currentAudioTrack.segmentLength
-    );
-    this.#audioSegmentNumber =
-      calculatedTargetSegment == 0 ? 1 : calculatedTargetSegment;
 
+    this.#audioSegmentNumber =
+      Math.floor(
+        this.#viewer.currentTime / this.#currentAudioTrack.segmentLength
+      ) + 1;
     this.#loadAudioSegment(this.#currentAudioTrack.init)
       .then(() => {
         return this.#repeatAudioSegmentLoad();
