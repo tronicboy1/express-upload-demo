@@ -24,6 +24,9 @@ MP4Box -dash 4000 -frag 4000 \
 "audio64.m4a#audio:id=audio64" \
 -out dash/sanshin.mpd
 ```
+https://accurate.video/docs/guides/encoding-multi-bitrate-content-optimal-dash-delivery/
+https://bitmovin.com/mp4box-dash-content-generation-x264/
+https://medium.com/canal-tech/how-video-streaming-works-on-the-web-an-introduction-7919739f7e1
 
 ## Mapping to Multiple Bitrates, splitting audo
 ```

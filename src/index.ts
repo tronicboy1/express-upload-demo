@@ -80,15 +80,12 @@ app.get("/video", (req, res) => {
   res.render("video.ejs");
 });
 
-app.get("/video/:name", (req, res) => {
-  const videoName = req.params.name;
-  res.sendFile(path.resolve(__dirname, "../uploads", videoName));
-});
-
-app.get("/video/stream/:name", (req, res) => {
-  const segmentName = req.params.name;
+app.get("/video/:videoId/:fileName", (req, res) => {
+  const fileName = req.params.fileName;
+  const videoId = req.params.videoId;
+  console.log(fileName, videoId);
   const readStream = createReadStream(
-    path.resolve(__dirname, "../uploads", segmentName)
+    path.resolve(__dirname, "../uploads", videoId, fileName)
   );
   readStream.on("error", err => {
     res.sendStatus(404);

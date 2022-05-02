@@ -1,7 +1,7 @@
 import VideoPlayer from "./video-player.js";
 
-const videoPlayer = new VideoPlayer("viewer");
-videoPlayer.loadVideo("sanshin.mpd");
+const videoPlayer = new VideoPlayer("viewer", "sanshin");
+videoPlayer.loadVideo();
 
 const qualitySelect = document.getElementById(
   "video-quality"

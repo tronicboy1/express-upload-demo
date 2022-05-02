@@ -16,6 +16,7 @@ class VideoPlayer {
   #controller: AbortController;
   #signal: AbortSignal;
   #first: boolean;
+  videoId: string;
   tracks: TrackInfo[];
   mediaSource: MediaSource;
   #videoSourceBuffer: SourceBuffer;
@@ -28,7 +29,7 @@ class VideoPlayer {
   #audioSegmentNumber: number;
   #finalSegmentNumber: number;
 
-  constructor(viewerElementId: string) {
+  constructor(viewerElementId: string, videoId: string) {
     const viewerElement = document.getElementById(viewerElementId);
     if (!(viewerElement instanceof HTMLVideoElement))
       throw Error("Element Id did not yield a valid player element");
@@ -36,10 +37,11 @@ class VideoPlayer {
     this.#controller = new AbortController();
     this.#signal = this.#controller.signal;
     this.#first = true;
+    this.videoId = videoId;
   }
 
-  async loadVideo(MPDFileName: string) {
-    await this.#getMPD(MPDFileName);
+  async loadVideo() {
+    await this.#getMPD();
     this.mediaSource = new MediaSource();
 
     const videoTrackName = "240p";
@@ -110,8 +112,8 @@ class VideoPlayer {
     }
   }
 
-  async #getMPD(fileName: string) {
-    const response = await fetch(`/video/${fileName}`);
+  async #getMPD() {
+    const response = await fetch(`/video/${this.videoId}/mpd.mpd`);
 
     if (!response.ok) throw Error(`Invalid response: ${response.status}`);
 
@@ -151,7 +153,7 @@ class VideoPlayer {
   }
 
   async #getSegment(segmentName: string) {
-    const response = await fetch(`/video/stream/${segmentName}`, {
+    const response = await fetch(`/video/${this.videoId}/${segmentName}`, {
       signal: this.#signal,
     });
 
@@ -241,13 +243,13 @@ class VideoPlayer {
       currentTime / this.#currentVideoTrack.segmentLength
     );
     this.#videoSegmentNumber =
-      calculatedTargetVideoSegment === 0 ? 1 : calculatedTargetVideoSegment;
+      calculatedTargetVideoSegment === 0 ? 1 : calculatedTargetVideoSegment - 1;
 
     const calculatedTargetAudioSegment = Math.floor(
       currentTime / this.#currentAudioTrack.segmentLength
     );
     this.#audioSegmentNumber =
-      calculatedTargetAudioSegment == 0 ? 1 : calculatedTargetAudioSegment;
+      calculatedTargetAudioSegment == 0 ? 1 : calculatedTargetAudioSegment - 1;
 
     return Promise.all([
       this.#repeatVideoSegmentLoad(),
