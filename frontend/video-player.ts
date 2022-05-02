@@ -29,7 +29,7 @@ class VideoPlayer {
   #audioSegmentNumber: number;
   #finalSegmentNumber: number;
 
-  constructor(viewerElementId: string, videoId: string) {
+  constructor(viewerElementId: string) {
     const viewerElement = document.getElementById(viewerElementId);
     if (!(viewerElement instanceof HTMLVideoElement))
       throw Error("Element Id did not yield a valid player element");
@@ -37,15 +37,16 @@ class VideoPlayer {
     this.#controller = new AbortController();
     this.#signal = this.#controller.signal;
     this.#first = true;
-    this.videoId = videoId;
   }
 
-  async loadVideo() {
+  async loadVideo(videoId: string) {
+    this.videoId = videoId;
+    this.#first = true;
     await this.#getMPD();
     this.mediaSource = new MediaSource();
 
     const videoTrackName = "240p";
-    const audioTrackName = "1";
+    const audioTrackName = "audio64";
     this.#currentVideoTrack = this.tracks.find(
       track => track.id === videoTrackName
     );

@@ -9,6 +9,10 @@
   </head>
   <body>
     <div>
+      <label for="video-quality">Video ID</label>
+      <select name="video-id" id="video-id"></select>
+    </div>
+    <div>
       <label for="video-quality">Video Quality</label>
       <select name="video-quality" id="video-quality">
         <option value="240p">240p</option>
@@ -19,12 +23,12 @@
     <div>
       <label for="audio-quality">Video Quality</label>
       <select name="audio-quality" id="audio-quality" value="1">
-        <option value="2">64kbps</option>
-        <option value="1">128kbps</option>
+        <option value="audio64">64kbps</option>
+        <option value="audio128">128kbps</option>
       </select>
     </div>
     <video
-      style="width: 100%; height: auto; max-height: 90vh"
+      style="width: 100%; height: auto; max-height: 80vh"
       id="viewer"
       autoplay
       controls

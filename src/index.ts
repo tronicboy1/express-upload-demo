@@ -2,7 +2,7 @@ import express from "express";
 import bodyParser from "body-parser";
 import path from "path";
 import https from "https";
-import { readFileSync, createReadStream } from "fs";
+import fs, { readFileSync, createReadStream } from "fs";
 import { execSync, exec } from "child_process";
 import multer from "multer";
 
@@ -54,7 +54,7 @@ app.get("/", (req, res) => {
     .then(stdout => console.log(JSON.parse(stdout)))
     .catch(error => console.log(error))
     .finally(() =>
-      res.render(path.join(__dirname, "index.ejs"), { message: "Hello World" })
+      res.render("index.ejs", { message: "Video Upload" })
     );
 });
 
@@ -71,7 +71,7 @@ app.post("/", upload.single("file"), (req, res) => {
   const filename = req.file.filename;
   const filenameNoExtension = filename.split(".")[0];
   if (!req.file) {
-    return res.render(path.join(__dirname, "index.ejs"), {
+    return res.render("index.ejs", {
       message: "Invalid Format",
     });
   }
@@ -93,7 +93,9 @@ app.post("/", upload.single("file"), (req, res) => {
       "720.h264#video:id=720p" \
       "audio128.m4a#audio:id=audio128:role=main" \
       "audio64.m4a#audio:id=audio64" \
-      -out mpd.mpd`,
+      -out mpd.mpd \
+      && rm 720.h264 480.h264 240.h264 audio128.m4a audio64.m4a \
+      && rm ../${filename}`,
       { encoding: "utf-8" },
       (error, stdout, stderr) => {
         if (error) reject(stderr);
@@ -103,11 +105,16 @@ app.post("/", upload.single("file"), (req, res) => {
   )
     .then(stdout => console.log(stdout))
     .catch(error => console.log(error))
-    .finally(() => res.redirect(`/uploads/${req.file.filename}`));
+    .finally(() => res.redirect("/"));
 });
 
 app.get("/video", (req, res) => {
   res.render("video.ejs");
+});
+
+app.get("/video/list", (req, res) => {
+  const fileNames = fs.readdirSync(path.resolve(__dirname, "../uploads"));
+  res.json(fileNames);
 });
 
 app.get("/video/:videoId/:fileName", (req, res) => {
