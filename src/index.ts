@@ -120,7 +120,6 @@ app.get("/video/list", (req, res) => {
 app.get("/video/:videoId/:fileName", (req, res) => {
   const fileName = req.params.fileName;
   const videoId = req.params.videoId;
-  console.log(fileName, videoId);
   const readStream = createReadStream(
     path.resolve(__dirname, "../uploads", videoId, fileName)
   );
