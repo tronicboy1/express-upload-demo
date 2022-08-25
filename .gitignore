@@ -3,3 +3,9 @@ node_modules
 *.pem
 public/*
 uploads/*
+dist
+
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml

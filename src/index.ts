@@ -2,9 +2,13 @@ import express from "express";
 import bodyParser from "body-parser";
 import path from "path";
 import https from "https";
+import http from "http";
 import fs, { readFileSync, createReadStream } from "fs";
 import { execSync, exec } from "child_process";
 import multer from "multer";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const storage = multer.diskStorage({
   destination(req, file, cb) {
@@ -32,13 +36,15 @@ app.set("view engine", "ejs");
 app.set("views", path.resolve(__dirname, "views"));
 app.use("/public", express.static(path.resolve(__dirname, "../public")));
 
-const server = https.createServer(
-  {
-    key: readFileSync(path.resolve(__dirname, "../key.pem")),
-    cert: readFileSync(path.resolve(__dirname, "../cert.pem")),
-  },
-  app
-);
+const server = process.env.SSL
+  ? https.createServer(
+      {
+        key: readFileSync(path.resolve(__dirname, "../key.pem")),
+        cert: readFileSync(path.resolve(__dirname, "../cert.pem")),
+      },
+      app
+    )
+  : http.createServer(app);
 
 app.get("/", (req, res) => {
   new Promise<string>((resolve, reject) =>
@@ -51,18 +57,14 @@ app.get("/", (req, res) => {
       }
     )
   )
-    .then(stdout => console.log(JSON.parse(stdout)))
-    .catch(error => console.log(error))
-    .finally(() =>
-      res.render("index.ejs", { message: "Video Upload" })
-    );
+    .then((stdout) => console.log(JSON.parse(stdout)))
+    .catch((error) => console.log(error))
+    .finally(() => res.render("index.ejs", { message: "Video Upload" }));
 });
 
 app.get("/uploads/:fileName", (req, res) => {
   console.log(req.params.fileName);
-  const fileStream = createReadStream(
-    path.resolve(__dirname, "../uploads", req.params.fileName)
-  );
+  const fileStream = createReadStream(path.resolve(__dirname, "../uploads", req.params.fileName));
   fileStream.pipe(res);
 });
 
@@ -103,8 +105,8 @@ app.post("/", upload.single("file"), (req, res) => {
       }
     )
   )
-    .then(stdout => console.log(stdout))
-    .catch(error => console.log(error))
+    .then((stdout) => console.log(stdout))
+    .catch((error) => console.log(error))
     .finally(() => res.redirect("/"));
 });
 
@@ -120,10 +122,8 @@ app.get("/video/list", (req, res) => {
 app.get("/video/:videoId/:fileName", (req, res) => {
   const fileName = req.params.fileName;
   const videoId = req.params.videoId;
-  const readStream = createReadStream(
-    path.resolve(__dirname, "../uploads", videoId, fileName)
-  );
-  readStream.on("error", err => {
+  const readStream = createReadStream(path.resolve(__dirname, "../uploads", videoId, fileName));
+  readStream.on("error", (err) => {
     res.sendStatus(404);
   });
   readStream.pipe(res);
