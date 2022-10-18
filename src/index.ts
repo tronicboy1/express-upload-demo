@@ -106,7 +106,7 @@ app.post("/", upload.single("file"), (req, res) => {
     )
   )
     .then((stdout) => console.log(stdout))
-    .catch((error) => console.log(error))
+    .catch((error) => console.error(error))
     .finally(() => res.redirect("/"));
 });
 
@@ -124,6 +124,7 @@ app.get("/video/:videoId/:fileName", (req, res) => {
   const videoId = req.params.videoId;
   const readStream = createReadStream(path.resolve(__dirname, "../uploads", videoId, fileName));
   readStream.on("error", (err) => {
+    console.error(err);
     res.sendStatus(404);
   });
   readStream.pipe(res);
