@@ -11,7 +11,7 @@ RUN yarn build-front
 FROM node:16.14.2-slim AS runner
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg gpac
 COPY --from=build /app/dist /app/dist
 COPY --from=build /app/public /app/public
 COPY package.json .

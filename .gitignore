@@ -2,7 +2,9 @@
 node_modules
 *.pem
 public/*
-uploads/*
+*.mpd
+*.mp4
+*.m4s
 dist
 
 # Elastic Beanstalk Files

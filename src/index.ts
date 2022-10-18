@@ -115,7 +115,7 @@ app.get("/video", (req, res) => {
 });
 
 app.get("/video/list", (req, res) => {
-  const fileNames = fs.readdirSync(path.resolve(__dirname, "../uploads"));
+  const fileNames = fs.readdirSync(path.resolve(__dirname, "../uploads")).filter((filename) => filename !== ".gitkeep");
   res.json(fileNames);
 });
 
