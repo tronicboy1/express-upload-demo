@@ -1,3 +1,24 @@
+# Getting started
+
+Execute the following commands to get the server started.
+
+```
+yarn mkcert
+yarn build-front
+yarn dev
+```
+
+**You must have ffmpeg installed locally for dev!**
+
+## Using Docker
+
+If you use docker to host you do not have to install ffmpeg locally.
+
+```
+docker build -t upload-demo .
+docker run --rm -d -p 4000:4000 upload-demo
+```
+
 ## SSL
 ```
 brew install mkcert
